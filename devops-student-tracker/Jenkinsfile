@@ -1,0 +1,158 @@
+pipeline {
+    agent any
+
+    environment {
+        // ====================================================================
+        // CONFIGURATION PARAMETERS
+        // Replace 'DOCKERHUB_USERNAME' with your actual Docker Hub username.
+        // ====================================================================
+        DOCKERHUB_USERNAME = 'your-dockerhub-username'
+        IMAGE_NAME         = 'student-tracker'
+        IMAGE_TAG          = "${env.BUILD_NUMBER}"
+        APP_VERSION        = "v1.0.${env.BUILD_NUMBER}"
+        DOCKER_CREDS_ID    = 'dockerhub-creds'
+
+        // Kubernetes identifiers (must match k8s/deployment.yaml and k8s/service.yaml)
+        DEPLOYMENT_NAME    = 'student-tracker'
+        CONTAINER_NAME     = 'student-tracker'
+        SERVICE_NAME       = 'student-tracker-service'
+
+        // Path to kubeconfig accessible by jenkins user on the EC2 instance
+        KUBECONFIG         = '/var/lib/jenkins/.kube/config'
+    }
+
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+    }
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                echo "=========================================================="
+                echo " Stage 1: Checkout Source Code"
+                echo "=========================================================="
+                checkout scm
+            }
+        }
+
+        stage('Test & Quality Gate') {
+            steps {
+                echo "=========================================================="
+                echo " Stage 2: Install Dependencies & Run Pytest Suite"
+                echo "=========================================================="
+                sh '''
+                    set -e
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements-dev.txt
+                    pytest tests/ -v --junitxml=test-results.xml
+                '''
+            }
+            post {
+                always {
+                    junit testResults: 'test-results.xml', allowEmptyResults: true
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                echo "=========================================================="
+                echo " Stage 3: Build Docker Image (${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG})"
+                echo "=========================================================="
+                sh '''
+                    set -e
+                    docker build \
+                        -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG} \
+                        -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest .
+                '''
+            }
+        }
+
+        stage('Docker Hub Push') {
+            steps {
+                echo "=========================================================="
+                echo " Stage 4 & 5: Authenticate & Push Image to Docker Hub"
+                echo "=========================================================="
+                withCredentials([usernamePassword(
+                    credentialsId: env.DOCKER_CREDS_ID,
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        set -e
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+                        docker push "${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
+                        docker logout
+                    '''
+                }
+            }
+        }
+
+        stage('Kubernetes Deploy') {
+            steps {
+                echo "=========================================================="
+                echo " Stage 6 & 7: Apply Manifests & Update Deployment Image"
+                echo "=========================================================="
+                sh '''
+                    set -e
+                    export KUBECONFIG=${KUBECONFIG}
+                    
+                    # 1. Apply Deployment and Service manifests
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+                    
+                    # 2. Update image to the exact tag built in this pipeline run
+                    kubectl set image deployment/${DEPLOYMENT_NAME} ${CONTAINER_NAME}=${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
+                    
+                    # 3. Update APP_VERSION environment variable to match current build
+                    kubectl set env deployment/${DEPLOYMENT_NAME} APP_VERSION=${APP_VERSION}
+                '''
+            }
+        }
+
+        stage('Verify Rollout') {
+            steps {
+                echo "=========================================================="
+                echo " Stage 8: Verify Deployment Rollout & Cluster Resources"
+                echo "=========================================================="
+                sh '''
+                    set -e
+                    export KUBECONFIG=${KUBECONFIG}
+                    
+                    # Wait for rollout completion (fails pipeline if pods fail readiness/liveness)
+                    kubectl rollout status deployment/${DEPLOYMENT_NAME} --timeout=120s
+                    
+                    echo "--- Running Pods ---"
+                    kubectl get pods -l app=${DEPLOYMENT_NAME} -o wide
+                    
+                    echo "--- Deployment Status ---"
+                    kubectl get deployment ${DEPLOYMENT_NAME}
+                    
+                    echo "--- Service Endpoints ---"
+                    kubectl get service ${SERVICE_NAME}
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "=================================================================="
+            echo " SUCCESS: Deployment of ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG} to Minikube succeeded!"
+            echo "=================================================================="
+        }
+        failure {
+            echo "=================================================================="
+            echo " ERROR: Pipeline failed! Check step logs above for failure cause."
+            echo "=================================================================="
+        }
+        always {
+            cleanWs deleteDirs: false, notFailBuild: true
+        }
+    }
+}

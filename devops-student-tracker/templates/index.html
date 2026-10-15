@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="DevOps Student Task Tracker - A Cloud Computing and DevOps CCA demonstration project featuring Jenkins CI/CD, Docker, and Kubernetes.">
+  <title>DevOps Student Task Tracker</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Section -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+            <path d="M2 17l10 5 10-5"></path>
+            <path d="M2 12l10 5 10-5"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="app-title">DevOps Student Task Tracker</h1>
+          <p class="app-subtitle">Cloud Computing & DevOps CI/CD Showcase</p>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <!-- Prominent Application Version -->
+        <div class="version-chip" id="versionChip" title="Application version deployed from CI/CD pipeline">
+          <span class="pulse-dot"></span>
+          <span class="version-label">Release:</span>
+          <span class="version-value" id="appVersionDisplay">v{{ app_version }}</span>
+        </div>
+        
+        <!-- Live Health Check Link -->
+        <a href="/health" target="_blank" class="status-badge" id="systemHealthBadge" title="Click to view JSON health check">
+          <span class="status-indicator"></span>
+          <span class="status-text">API Healthy</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- DevOps Pipeline Banner -->
+    <div class="pipeline-card">
+      <div class="pipeline-header">
+        <span class="pipeline-title">DevOps Pipeline Architecture</span>
+        <span class="pipeline-tag">Active Stack</span>
+      </div>
+      <div class="pipeline-flow">
+        <div class="pipeline-step">
+          <span class="step-num">01</span>
+          <span class="step-label">Git Push</span>
+          <span class="step-sub">GitHub</span>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+          <span class="step-num">02</span>
+          <span class="step-label">CI Build &amp; Test</span>
+          <span class="step-sub">Jenkins</span>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+          <span class="step-num">03</span>
+          <span class="step-label">Containerize</span>
+          <span class="step-sub">Docker Hub</span>
+        </div>
+        <div class="pipeline-arrow">&rarr;</div>
+        <div class="pipeline-step">
+          <span class="step-num">04</span>
+          <span class="step-label">Orchestrate</span>
+          <span class="step-sub">Kubernetes / Minikube</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics Overview Cards -->
+    <section class="stats-grid">
+      <div class="stat-card stat-total">
+        <div class="stat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-number" id="statTotal">{{ stats.total }}</span>
+          <span class="stat-name">Total Tasks</span>
+        </div>
+      </div>
+
+      <div class="stat-card stat-completed">
+        <div class="stat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-number" id="statCompleted">{{ stats.completed }}</span>
+          <span class="stat-name">Completed Tasks</span>
+        </div>
+      </div>
+
+      <div class="stat-card stat-pending">
+        <div class="stat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 14 14"></polyline>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <span class="stat-number" id="statPending">{{ stats.pending }}</span>
+          <span class="stat-name">Pending Tasks</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Content: Create Task Form & Task List -->
+    <main class="main-layout">
+      <!-- Create Task Card -->
+      <section class="card form-card">
+        <div class="card-header">
+          <h2 class="card-title">Add New Assignment Task</h2>
+        </div>
+        <form id="taskForm" class="task-form">
+          <div class="form-group">
+            <label for="taskTitle" class="form-label">Task Title <span class="required">*</span></label>
+            <input 
+              type="text" 
+              id="taskTitle" 
+              name="title" 
+              class="form-input" 
+              placeholder="e.g. Write Jenkinsfile with rollout stage" 
+              required
+              maxlength="120"
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="taskDesc" class="form-label">Description (Optional)</label>
+            <textarea 
+              id="taskDesc" 
+              name="description" 
+              class="form-textarea" 
+              rows="2" 
+              placeholder="Add key notes, commands, or submission criteria..."
+            ></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="taskCategory" class="form-label">Category</label>
+              <select id="taskCategory" name="category" class="form-select">
+                <option value="DevOps">DevOps</option>
+                <option value="Jenkins">Jenkins</option>
+                <option value="Docker">Docker</option>
+                <option value="Kubernetes">Kubernetes</option>
+                <option value="Python">Python</option>
+                <option value="General" selected>General</option>
+              </select>
+            </div>
+
+            <div class="form-group flex-1">
+              <label for="taskPriority" class="form-label">Priority</label>
+              <select id="taskPriority" name="priority" class="form-select">
+                <option value="Low">Low</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="High">High</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" id="addTaskBtn" class="btn btn-primary btn-block">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Task
+          </button>
+        </form>
+      </section>
+
+      <!-- Task List Card -->
+      <section class="card list-card">
+        <div class="card-header task-list-header">
+          <h2 class="card-title">Current Task Board</h2>
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all">All</button>
+            <button class="filter-tab" data-filter="pending">Pending</button>
+            <button class="filter-tab" data-filter="completed">Completed</button>
+          </div>
+        </div>
+
+        <div id="toastNotification" class="toast hidden"></div>
+
+        <!-- Dynamic Task List Container -->
+        <div id="taskList" class="task-list">
+          <!-- Populated by JavaScript and server-side fallback -->
+          {% if tasks %}
+            {% for task in tasks %}
+            <div class="task-item {% if task.completed %}is-completed{% endif %}" data-id="{{ task.id }}" data-category="{{ task.category }}" data-priority="{{ task.priority }}" data-status="{% if task.completed %}completed{% else %}pending{% endif %}">
+              <div class="task-checkbox-wrap">
+                <button class="task-checkbox {% if task.completed %}checked{% endif %}" onclick="toggleTask({{ task.id }})" aria-label="Toggle task status">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <div class="task-body">
+                <div class="task-title-row">
+                  <span class="task-title-text">{{ task.title }}</span>
+                  <div class="task-tags">
+                    <span class="badge badge-category badge-{{ task.category.lower() }}">{{ task.category }}</span>
+                    <span class="badge badge-priority badge-{{ task.priority.lower() }}">{{ task.priority }}</span>
+                  </div>
+                </div>
+                {% if task.description %}
+                <p class="task-desc-text">{{ task.description }}</p>
+                {% endif %}
+                <div class="task-meta">
+                  <span>Created: {{ task.created_at }}</span>
+                </div>
+              </div>
+              <div class="task-actions">
+                <button class="btn-icon delete-btn" onclick="deleteTask({{ task.id }})" title="Delete task" aria-label="Delete task">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state" id="emptyState">
+              <div class="empty-icon">🎯</div>
+              <h3>No tasks found</h3>
+              <p>Add your first DevOps or Cloud Computing task above to get started!</p>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer with API Endpoints Info -->
+    <footer class="app-footer">
+      <div class="footer-links">
+        <span>DevOps Endpoints:</span>
+        <a href="/health" target="_blank" class="footer-link">GET /health</a>
+        <span class="footer-sep">&bull;</span>
+        <a href="/version" target="_blank" class="footer-link">GET /version</a>
+        <span class="footer-sep">&bull;</span>
+        <a href="/api/tasks" target="_blank" class="footer-link">GET /api/tasks</a>
+      </div>
+      <p class="footer-copy">Designed for CCA Assignment &bull; Flask + Docker + Jenkins CI/CD + Minikube</p>
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

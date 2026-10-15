@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Python caches and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Pytest and testing
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+test-results.xml
+
+# CI/CD and deployment files not needed in runtime image
+Jenkinsfile
+.dockerignore
+Dockerfile
+README.md
+k8s/
+*.md
+
+# Local environment and secret files
+.env
+.env.*
+*.log

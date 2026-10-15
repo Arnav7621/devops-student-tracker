@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-tracker
+  labels:
+    app: student-tracker
+    tier: frontend
+    project: devops-student-tracker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: student-tracker
+  template:
+    metadata:
+      labels:
+        app: student-tracker
+        tier: frontend
+    spec:
+      containers:
+        - name: student-tracker
+          # Placeholder image: Updated dynamically by the Jenkins pipeline with exact build tag
+          image: DOCKERHUB_USERNAME/student-tracker:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+              name: http
+              protocol: TCP
+          env:
+            - name: APP_VERSION
+              value: "local"
+            - name: PORT
+              value: "5000"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          # Liveness probe to restart unhealthy containers
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Readiness probe to route traffic only when container is ready
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
